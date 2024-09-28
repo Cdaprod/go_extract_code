@@ -36,7 +36,7 @@ jobs:
       # Step 5: Build the Go binary and place it in the root
       - name: Build Go Binary
         run: |
-          go build -o go_extract_code ./cli.go ./main.go  # Build the binary directly in the root directory
+          go build -o go_extract_code ./main.go  # Build the binary directly in the root directory
 
       # Step 6: Commit and push the binary back to the repository
       - name: Commit and Push Binary
