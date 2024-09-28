@@ -3,10 +3,10 @@ name: Build Go Binary
 on:
   push:
     branches:
-      - main  # Change to your default branch if different
+      - '**'  # Change to your default branch if different
   pull_request:
     branches:
-      - main
+      - '**'
 
 jobs:
   build:
