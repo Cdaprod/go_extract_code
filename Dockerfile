@@ -1,5 +1,5 @@
 # Stage 1: Build the Go binary
-FROM golang:1.20 as builder
+FROM golang:1.20 AS builder
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -16,17 +16,17 @@ COPY . .
 # Build the Go app
 RUN go build -o go_extract_code ./main.go
 
-# Stage 2: Create a smaller image and copy the binary from the builder stage
+# Stage 2: Create a smaller image
 FROM alpine:latest
 
-# Set the working directory in the new container
+# Set the working directory
 WORKDIR /root/
 
 # Copy the binary from the builder stage
 COPY --from=builder /app/go_extract_code .
 
-# Expose port if your application listens to a specific port
-# EXPOSE 8080
+# Expose port 8080 to the outside world (if applicable)
+EXPOSE 8080
 
-# Run the binary
+# Command to run the executable
 CMD ["./go_extract_code"]
