@@ -1,0 +1,17 @@
+name: Test Extract Code Action
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Extract Code Action
+        uses: ./.github/actions/extract-code
+        with:
+          build_file: 'docs/BUILD.md'
+          output_dir: 'build_output'
+          verbose: 'true'

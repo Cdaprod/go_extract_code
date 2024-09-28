@@ -1,0 +1,3 @@
+name: extract-code
+description: Extract code blocks from BUILD.md files.
+version: 1.0.0
