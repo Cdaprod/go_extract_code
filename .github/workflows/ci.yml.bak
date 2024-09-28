@@ -1,0 +1,55 @@
+name: Extract Go Code Blocks
+
+on:
+  push:
+    paths:
+      - 'scripts/BUILD.md'      # Adjust the path as needed
+      - 'scripts/**'             # Include any other relevant script paths
+  pull_request:
+    paths:
+      - 'scripts/BUILD.md'
+      - 'scripts/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Go environment
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'  # Specify the Go version you need
+
+      # Step 3: Install Dependencies
+      - name: Install Go Dependencies
+        run: go mod tidy
+
+      # Step 4: Run the Go Application
+      - name: Run Extract Code Application
+        run: go run cli.go -build=scripts/BUILD.md -out=generated_code -v
+        # Adjust the paths based on your project structure
+
+      # Step 5: Commit and Push Generated Files (Optional)
+      - name: Commit and Push Generated Files
+        if: success() && github.ref == 'refs/heads/main'  # Adjust branch as needed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Add generated files
+          git add generated_code/
+
+          # Check if there are changes
+          if ! git diff --cached --exit-code; then
+            git commit -m "chore: Update generated Go code from BUILD.md [skip ci]"
+            git push
+          else
+            echo "No changes to commit."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

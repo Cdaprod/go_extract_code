@@ -1,0 +1,15 @@
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/pre-commit/mirrors-gofmt
+    rev: v1.16.0  # Use the latest version
+    hooks:
+      - id: gofmt
+  - repo: https://github.com/pre-commit/mirrors-goimports
+    rev: v0.12.0  # Use the latest version
+    hooks:
+      - id: goimports
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.51.2  # Use the latest version
+    hooks:
+      - id: golangci-lint
+        args: [run]

@@ -1,18 +1,22 @@
-name: Extract Go Code Blocks
+# .github/workflows/ci.yml
+name: CI Pipeline
 
 on:
   push:
-    paths:
-      - 'scripts/BUILD.md'      # Adjust the path as needed
-      - 'scripts/**'             # Include any other relevant script paths
+    branches:
+      - main
   pull_request:
-    paths:
-      - 'scripts/BUILD.md'
-      - 'scripts/**'
+    branches:
+      - main
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        go-version: [1.20.x]
+        architecture: [amd64, arm64]
 
     steps:
       # Step 1: Checkout the repository
@@ -23,33 +27,57 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.20'  # Specify the Go version you need
+          go-version: ${{ matrix.go-version }}
 
       # Step 3: Install Dependencies
-      - name: Install Go Dependencies
+      - name: Install Dependencies
         run: go mod tidy
 
-      # Step 4: Run the Go Application
-      - name: Run Extract Code Application
-        run: go run cli.go -build=scripts/BUILD.md -out=generated_code -v
-        # Adjust the paths based on your project structure
-
-      # Step 5: Commit and Push Generated Files (Optional)
-      - name: Commit and Push Generated Files
-        if: success() && github.ref == 'refs/heads/main'  # Adjust branch as needed
+      # Step 4: Install golangci-lint
+      - name: Install golangci-lint
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Add generated files
-          git add generated_code/
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
 
-          # Check if there are changes
-          if ! git diff --cached --exit-code; then
-            git commit -m "chore: Update generated Go code from BUILD.md [skip ci]"
-            git push
-          else
-            echo "No changes to commit."
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Step 5: Run golangci-lint
+      - name: Run golangci-lint
+        run: golangci-lint run
+
+      # Step 6: Run Tests with Coverage
+      - name: Run Tests with Coverage
+        run: go test -coverprofile=coverage.out ./...
+
+      # Step 7: Upload Coverage Report
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage.out
+
+      # Step 8: Build the Binary
+      - name: Build Binary
+        run: go build -o go_extract_code ./main.go
+
+      # Step 9: Archive the Binary
+      - name: Archive Binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: go_extract_code-${{ matrix.architecture }}
+          path: go_extract_code
+
+      # Step 10: Log in to GitHub Container Registry (Optional)
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 11: Build Docker Image (Optional)
+      - name: Build Docker Image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/go_extract_code:${{ github.sha }} .
+
+      # Step 12: Push Docker Image (Optional)
+      - name: Push Docker Image
+        run: |
+          docker push ghcr.io/${{ github.repository }}/go_extract_code:${{ github.sha }}

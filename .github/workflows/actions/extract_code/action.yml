@@ -1,0 +1,23 @@
+name: "Extract Code Blocks"
+description: "Extracts code blocks from BUILD.md files and creates corresponding files."
+inputs:
+  build_file:
+    description: "Path to the BUILD.md file."
+    required: true
+    default: "BUILD.md"
+  output_dir:
+    description: "Output directory for generated files."
+    required: true
+    default: "."
+  verbose:
+    description: "Enable verbose output."
+    required: false
+    default: "false"
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  args:
+    - "${{ inputs.build_file }}"
+    - "${{ inputs.output_dir }}"
+    - "${{ inputs.verbose }}"

@@ -1,0 +1,13 @@
+# .golangci.yml
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - golint
+    - gofmt
+    - goimports
+    - deadcode
+    - unused
+run:
+  timeout: 5m
