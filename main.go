@@ -272,3 +272,8 @@ func generateUniqueFilePath(path string) string {
 		counter++
 	}
 }
+
+func main() {
+	// Call a function from cli.go
+	runCLI()
+}

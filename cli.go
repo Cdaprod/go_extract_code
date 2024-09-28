@@ -122,7 +122,7 @@ func runCLI() {
 	printSuccess(fmt.Sprintf("Processing complete! %d files created.", len(fileDataList)))
 }
 
-// Entry point for the program
-func main() {
-	runCLI()
-}
+// // Entry point for the program 
+// func main() {
+// 	runCLI()
+// }
