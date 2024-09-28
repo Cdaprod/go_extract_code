@@ -23,12 +23,16 @@ jobs:
         with:
           go-version: '1.20'  # Specify the Go version you need
 
-      # Step 3: Build the Go binary
+      # Step 3: Install Dependencies and Update go.sum
+      - name: Install Go Dependencies
+        run: go mod tidy  # This will ensure go.sum is updated
+
+      # Step 4: Build the Go binary
       - name: Build Go Binary
         run: |
           go build -o go_extract_code ./cli.go ./main.go  # Specify your main files
 
-      # Step 4: Commit and push the binary back to the repository
+      # Step 5: Commit and push the binary back to the repository
       - name: Commit and Push Binary
         run: |
           git config user.name "github-actions[bot]"
@@ -42,9 +46,10 @@ jobs:
 
             # Add the binary to the Git index
             git add binaries/go_extract_code
+            git add go.mod go.sum  # Ensure go.mod and go.sum are added
 
             # Commit the changes
-            git commit -m "ci: Add built binary go_extract_code [skip ci]"
+            git commit -m "ci: Add built binary go_extract_code and update go.mod/go.sum [skip ci]"
             # Push changes to the repository
             git push origin HEAD:main  # Change to your target branch if different
           else
