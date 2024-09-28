@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"flag"
 
 	"github.com/cheggaaa/pb/v3"
 	"github.com/fatih/color"
