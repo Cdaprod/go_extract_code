@@ -63,8 +63,8 @@ func (fp *FileProcessor) Process() ([]FileData, error) {
 
 		if codeBlockStartRegex.MatchString(line) {
 			if inCodeBlock {
-				// Nested code block detected; increase nesting level
-				currentExtension = getExtension(codeBlockStartRegex.FindStringSubmatch(line)[1])
+				// Nested code block detected; skip processing
+				fp.verbosePrint("[DEBUG] Nested code block detected. Skipping...")
 				continue
 			}
 			// Starting a new top-level code block
@@ -73,6 +73,7 @@ func (fp *FileProcessor) Process() ([]FileData, error) {
 			if len(matches) == 2 {
 				currentExtension = getExtension(matches[1])
 			}
+			fp.verbosePrint(fmt.Sprintf("[DEBUG] Starting %s code block", currentExtension))
 			continue
 		}
 
@@ -90,6 +91,7 @@ func (fp *FileProcessor) Process() ([]FileData, error) {
 				inCodeBlock = false
 				currentFilePath = ""
 				codeLines = []string{}
+				fp.verbosePrint("[DEBUG] Ending code block")
 			}
 			continue
 		}
@@ -102,9 +104,7 @@ func (fp *FileProcessor) Process() ([]FileData, error) {
 			matches := filePathRegex.FindStringSubmatch(line)
 			if len(matches) == 2 {
 				currentFilePath = matches[1]
-				if fp.Verbose {
-					fmt.Printf("[DEBUG] Detected file path: %s\n", currentFilePath)
-				}
+				fp.verbosePrint(fmt.Sprintf("[DEBUG] Detected file path: %s", currentFilePath))
 			}
 		}
 	}
@@ -119,50 +119,37 @@ func (fp *FileProcessor) Process() ([]FileData, error) {
 // getExtension maps language names to file extensions.
 func getExtension(language string) string {
 	extensions := map[string]string{
-		"go":          ".go",
-		"python":      ".py",
-		"js":          ".js",
-		"javascript":  ".js",
-		"html":        ".html",
-		"markdown":    ".md",
-		"yaml":        ".yaml",
-		"json":        ".json",
-		"shell":       ".sh",
-		"bash":        ".sh",
-		"csharp":      ".cs",
-		"sql":         ".sql",
-		"javascript":  ".js",
-		"typescript":  ".ts",
-		"ruby":        ".rb",
-		"php":         ".php",
-		"swift":       ".swift",
-		"kotlin":      ".kt",
-		"rust":        ".rs",
-		"java":        ".java",
-		"c":           ".c",
-		"cpp":         ".cpp",
-		"typescript":  ".ts",
-		"jsx":         ".jsx",
-		"tsx":         ".tsx",
-		"graphql":     ".graphql",
-		"dockerfile":  ".Dockerfile",
-		"dockerfile":  ".dockerfile",
-		"makefile":    ".makefile",
-		"makefile":    ".mk",
-		"powershell":  ".ps1",
-		"ruby":        ".rb",
-		"perl":        ".pl",
-		"lua":         ".lua",
-		"scala":       ".scala",
-		"elixir":      ".ex",
-		"erlang":      ".erl",
-		"haskell":     ".hs",
-		"clojure":     ".clj",
-		"fsharp":      ".fs",
-		"r":           ".r",
-		"matlab":      ".m",
-		"groovy":      ".groovy",
-		"shellscript": ".sh",
+		"go":         ".go",
+		"python":     ".py",
+		"js":         ".js",
+		"javascript": ".js",
+		"html":       ".html",
+		"markdown":   ".md",
+		"yaml":       ".yaml",
+		"json":       ".json",
+		"shell":      ".sh",
+		"bash":       ".sh",
+		"csharp":     ".cs",
+		"sql":        ".sql",
+		"typescript": ".ts",
+		"jsx":        ".jsx",
+		"tsx":        ".tsx",
+		"graphql":    ".graphql",
+		"dockerfile": ".dockerfile",
+		"makefile":   ".mk",
+		"powershell": ".ps1",
+		"ruby":       ".rb",
+		"perl":       ".pl",
+		"lua":        ".lua",
+		"scala":      ".scala",
+		"elixir":     ".ex",
+		"erlang":     ".erl",
+		"haskell":    ".hs",
+		"clojure":    ".clj",
+		"fsharp":     ".fs",
+		"r":          ".r",
+		"matlab":     ".m",
+		"groovy":     ".groovy",
 	}
 
 	if ext, exists := extensions[strings.ToLower(language)]; exists {
@@ -279,6 +266,13 @@ func generateUniqueFilePath(path string) string {
 	}
 }
 
+// verbosePrint prints messages if verbose mode is enabled.
+func (fp *FileProcessor) verbosePrint(message string) {
+	if fp.Verbose {
+		fmt.Println(message)
+	}
+}
+
 // runCLI orchestrates the CLI flow.
 func runCLI() {
 	// Colorized print functions
@@ -377,7 +371,7 @@ func runCLI() {
 		}
 		bar.Increment()
 		// Simulate processing time
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond) // Reduced sleep time for faster processing
 	}
 
 	bar.Finish()
