@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go app
-RUN go build -o go_extract_code ./cli.go ./main.go
+RUN go build -o go_extract_code ./main.go
 
 # Stage 2: Create a smaller image and copy the binary from the builder stage
 FROM alpine:latest
