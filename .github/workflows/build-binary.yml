@@ -1,0 +1,54 @@
+name: Build Go Binary
+
+on:
+  push:
+    branches:
+      - main  # Change to your default branch if different
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Go environment
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'  # Specify the Go version you need
+
+      # Step 3: Build the Go binary
+      - name: Build Go Binary
+        run: |
+          go build -o go_extract_code ./cli.go ./main.go  # Specify your main files
+
+      # Step 4: Commit and push the binary back to the repository
+      - name: Commit and Push Binary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if the binary exists
+          if [ -f go_extract_code ]; then
+            # Move binary to a specific folder if needed
+            mkdir -p binaries
+            mv go_extract_code binaries/
+
+            # Add the binary to the Git index
+            git add binaries/go_extract_code
+
+            # Commit the changes
+            git commit -m "ci: Add built binary go_extract_code [skip ci]"
+            # Push changes to the repository
+            git push origin HEAD:main  # Change to your target branch if different
+          else
+            echo "Binary not found, skipping commit."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use the default GITHUB_TOKEN provided by GitHub Actions
