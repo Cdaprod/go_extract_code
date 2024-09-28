@@ -3,11 +3,16 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
+
+	"github.com/cheggaaa/pb/v3"
+	"github.com/fatih/color"
 )
 
 // FileProcessor handles the processing of the build file.
@@ -15,6 +20,12 @@ type FileProcessor struct {
 	BuildFilePath string
 	OutputDir     string
 	Verbose       bool
+}
+
+// FileData holds information about a file to be created.
+type FileData struct {
+	Path     string
+	Contents []string
 }
 
 // NewFileProcessor initializes a new FileProcessor.
@@ -26,7 +37,7 @@ func NewFileProcessor(buildFilePath, outputDir string, verbose bool) *FileProces
 	}
 }
 
-// Process reads the build file and extracts code blocks.
+// Process reads the build file and extracts top-level code blocks.
 func (fp *FileProcessor) Process() ([]FileData, error) {
 	file, err := os.Open(fp.BuildFilePath)
 	if err != nil {
@@ -38,45 +49,37 @@ func (fp *FileProcessor) Process() ([]FileData, error) {
 
 	// Regular expressions
 	filePathRegex := regexp.MustCompile(`^\*\*file:\*\*\s*` + "`" + `([^` + "`" + `]+)` + "`")
-	codeBlockRegex := regexp.MustCompile("^```([a-zA-Z]+)")
+	codeBlockStartRegex := regexp.MustCompile("^```([a-zA-Z]+)")
+	codeBlockEndRegex := regexp.MustCompile("^```$")
 
 	var currentFilePath string
 	var currentExtension string
 	inCodeBlock := false
-	var codeLines []string
-	var fileDataList []FileData
+	codeLines := []string{}
+	fileDataList := []FileData{}
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if !inCodeBlock {
-			// Check for file path
-			matches := filePathRegex.FindStringSubmatch(line)
+		if codeBlockStartRegex.MatchString(line) {
+			if inCodeBlock {
+				// Nested code block detected; increase nesting level
+				currentExtension = getExtension(codeBlockStartRegex.FindStringSubmatch(line)[1])
+				continue
+			}
+			// Starting a new top-level code block
+			inCodeBlock = true
+			matches := codeBlockStartRegex.FindStringSubmatch(line)
 			if len(matches) == 2 {
-				currentFilePath = matches[1]
-				if fp.Verbose {
-					fmt.Printf("[DEBUG] Detected file path: %s\n", currentFilePath)
-				}
-				continue
+				currentExtension = getExtension(matches[1])
 			}
+			continue
+		}
 
-			// Check for code block start
-			codeMatches := codeBlockRegex.FindStringSubmatch(line)
-			if len(codeMatches) == 2 {
-				currentExtension = getExtension(codeMatches[1])
-				inCodeBlock = true
-				codeLines = []string{}
-				if fp.Verbose {
-					fmt.Printf("[DEBUG] Starting %s code block\n", codeMatches[1])
-				}
-				continue
-			}
-		} else {
-			// Check for code block end
-			if strings.TrimSpace(line) == "```" {
-				// Determine file path and extension
+		if codeBlockEndRegex.MatchString(line) {
+			if inCodeBlock {
+				// Ending the top-level code block
 				fullPath := determineFilePath(currentFilePath, currentExtension, fp.OutputDir, codeLines)
-
 				fileData := FileData{
 					Path:     fullPath,
 					Contents: codeLines,
@@ -86,20 +89,21 @@ func (fp *FileProcessor) Process() ([]FileData, error) {
 				// Reset state
 				inCodeBlock = false
 				currentFilePath = ""
-				continue
-			} else {
-				// Accumulate code lines
-				codeLines = append(codeLines, line)
+				codeLines = []string{}
+			}
+			continue
+		}
 
-				// If first line inside code block and no file path, check for comment
-				if len(codeLines) == 1 && currentFilePath == "" {
-					possiblePath := extractPathFromComment(line, currentExtension)
-					if possiblePath != "" {
-						currentFilePath = possiblePath
-						if fp.Verbose {
-							fmt.Printf("[DEBUG] Detected path from comment: %s\n", currentFilePath)
-						}
-					}
+		if inCodeBlock {
+			// Accumulate code lines only if inside a top-level code block
+			codeLines = append(codeLines, line)
+		} else {
+			// Check for file path specification
+			matches := filePathRegex.FindStringSubmatch(line)
+			if len(matches) == 2 {
+				currentFilePath = matches[1]
+				if fp.Verbose {
+					fmt.Printf("[DEBUG] Detected file path: %s\n", currentFilePath)
 				}
 			}
 		}
@@ -112,27 +116,55 @@ func (fp *FileProcessor) Process() ([]FileData, error) {
 	return fileDataList, nil
 }
 
-// FileData holds information about a file to be created.
-type FileData struct {
-	Path     string
-	Contents []string
-}
-
 // getExtension maps language names to file extensions.
 func getExtension(language string) string {
 	extensions := map[string]string{
-		"go":        ".go",
-		"python":    ".py",
-		"js":        ".js",
-		"javascript": ".js",
-		"html":      ".html",
-		"markdown":  ".md",
-		"yaml":      ".yaml",
-		"json":      ".json",
-		"shell":     ".sh",
-		"bash":      ".sh",
-		// Add more languages and extensions as needed
+		"go":          ".go",
+		"python":      ".py",
+		"js":          ".js",
+		"javascript":  ".js",
+		"html":        ".html",
+		"markdown":    ".md",
+		"yaml":        ".yaml",
+		"json":        ".json",
+		"shell":       ".sh",
+		"bash":        ".sh",
+		"csharp":      ".cs",
+		"sql":         ".sql",
+		"javascript":  ".js",
+		"typescript":  ".ts",
+		"ruby":        ".rb",
+		"php":         ".php",
+		"swift":       ".swift",
+		"kotlin":      ".kt",
+		"rust":        ".rs",
+		"java":        ".java",
+		"c":           ".c",
+		"cpp":         ".cpp",
+		"typescript":  ".ts",
+		"jsx":         ".jsx",
+		"tsx":         ".tsx",
+		"graphql":     ".graphql",
+		"dockerfile":  ".Dockerfile",
+		"dockerfile":  ".dockerfile",
+		"makefile":    ".makefile",
+		"makefile":    ".mk",
+		"powershell":  ".ps1",
+		"ruby":        ".rb",
+		"perl":        ".pl",
+		"lua":         ".lua",
+		"scala":       ".scala",
+		"elixir":      ".ex",
+		"erlang":      ".erl",
+		"haskell":     ".hs",
+		"clojure":     ".clj",
+		"fsharp":      ".fs",
+		"r":           ".r",
+		"matlab":      ".m",
+		"groovy":      ".groovy",
+		"shellscript": ".sh",
 	}
+
 	if ext, exists := extensions[strings.ToLower(language)]; exists {
 		return ext
 	}
@@ -150,48 +182,22 @@ func determineFilePath(currentFilePath, currentExtension, outputDir string, code
 		return filepath.Join(outputDir, currentFilePath)
 	}
 
-	// Default to outputDir's parent with a generated filename
-	defaultFileName := fmt.Sprintf("default_%s%s", strings.ReplaceAll(firstNonEmptyLine(codeLines), " ", "_"), currentExtension)
-	return filepath.Join(outputDir, "..", defaultFileName)
+	// Default to outputDir with a generated filename
+	defaultFileName := fmt.Sprintf("default_%s%s", firstNonEmptyLine(codeLines), currentExtension)
+	return filepath.Join(outputDir, defaultFileName)
 }
 
-// firstNonEmptyLine returns the first non-empty line from codeLines.
+// firstNonEmptyLine returns the first non-empty, sanitized line from codeLines.
 func firstNonEmptyLine(codeLines []string) string {
 	for _, line := range codeLines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed != "" {
-			return trimmed
+			// Replace spaces with underscores and remove non-alphanumeric characters
+			processed := regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(trimmed, "_")
+			return processed
 		}
 	}
 	return "unknown"
-}
-
-// extractPathFromComment extracts file path from a comment line.
-func extractPathFromComment(line, extension string) string {
-	// Define comment styles for different languages
-	commentPatterns := map[string]*regexp.Regexp{
-		"//":     regexp.MustCompile(`^//\s*(.+)$`),        // Go, JavaScript
-		"#":      regexp.MustCompile(`^#\s*(.+)$`),         // Python, Shell
-		"<!--":   regexp.MustCompile(`^<!--\s*(.+)\s*-->$`), // HTML comments
-		"/*":     regexp.MustCompile(`^/\*\s*(.+)\s*\*/$`), // C-style comments
-		"--":     regexp.MustCompile(`^--\s*(.+)$`),        // SQL
-	}
-
-	for prefix, regex := range commentPatterns {
-		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
-			matches := regex.FindStringSubmatch(line)
-			if len(matches) == 2 {
-				// Ensure the path has the correct extension
-				ext := filepath.Ext(matches[1])
-				if ext == "" {
-					return matches[1] + extension
-				}
-				return matches[1]
-			}
-		}
-	}
-
-	return ""
 }
 
 // validateOutputDir ensures the output directory exists or creates it.
@@ -273,7 +279,111 @@ func generateUniqueFilePath(path string) string {
 	}
 }
 
+// runCLI orchestrates the CLI flow.
+func runCLI() {
+	// Colorized print functions
+	var (
+		purple = color.New(color.FgMagenta).Add(color.Bold)
+		blue   = color.New(color.FgBlue)
+		green  = color.New(color.FgGreen)
+		orange = color.New(color.FgHiYellow)
+		yellow = color.New(color.FgYellow)
+		red    = color.New(color.FgRed).Add(color.Bold)
+	)
+
+	// Helper functions for colored output
+	printHeader := func(message string) {
+		purple.Println("\n=== " + message + " ===\n")
+	}
+
+	printStep := func(message string) {
+		blue.Println("➡️  " + message)
+	}
+
+	printSuccess := func(message string) {
+		green.Println("✅  " + message)
+	}
+
+	printWarning := func(message string) {
+		yellow.Println("⚠️  " + message)
+	}
+
+	printError := func(message string) {
+		red.Println("❌  " + message)
+	}
+
+	promptConfirmation := func(prompt string) bool {
+		orange.Print(prompt + " [y/n]: ")
+		var response string
+		fmt.Scanln(&response)
+		response = strings.ToLower(strings.TrimSpace(response))
+		return response == "y" || response == "yes"
+	}
+
+	printHeader("Enhanced Code Block Extractor CLI")
+
+	// Define command-line flags
+	buildFilePath := flag.String("build", "docs/BUILD.md", "Path to the BUILD.md file")
+	outputDir := flag.String("out", "build_output/go_web_server_app", "Output directory where files will be created")
+	verbose := flag.Bool("v", false, "Enable verbose output")
+	flag.Parse()
+
+	// Display selected options
+	printStep(fmt.Sprintf("Selected Build File: %s", *buildFilePath))
+	printStep(fmt.Sprintf("Selected Output Directory: %s", *outputDir))
+
+	// Confirm with the user
+	if !promptConfirmation("Do you wish to continue with these settings?") {
+		printError("Operation aborted by user.")
+		os.Exit(1)
+	}
+
+	// Validate output directory
+	printStep("Validating output directory...")
+	err := validateOutputDir(*outputDir)
+	if err != nil {
+		printError(fmt.Sprintf("Invalid output directory: %v", err))
+		os.Exit(1)
+	}
+	printSuccess("Output directory is valid.")
+
+	// Process the build file
+	printStep("Processing build file...")
+	fileProcessor := NewFileProcessor(*buildFilePath, *outputDir, *verbose)
+	fileDataList, err := fileProcessor.Process()
+	if err != nil {
+		printError(fmt.Sprintf("Error processing build file: %v", err))
+		os.Exit(1)
+	}
+
+	if len(fileDataList) == 0 {
+		printWarning("No code blocks found to process.")
+		os.Exit(0)
+	}
+
+	// Initialize progress bar
+	bar := pb.Full.Start(len(fileDataList))
+	bar.SetTemplate(`{{string . "prefix"}}{{ bar . "[" "#" "-" "]" }} {{percent .}} | {{counters .}} | {{etime .}}`)
+	bar.Set("prefix", "📄 Processing Files: ")
+
+	// Process each file with progress bar
+	for _, fileData := range fileDataList {
+		// Write the file
+		err := writeCodeToFile(fileData.Path, fileData.Contents)
+		if err != nil {
+			printWarning(fmt.Sprintf("Failed to write file %s: %v", fileData.Path, err))
+		} else {
+			green.Printf("✅ Created: %s\n", fileData.Path)
+		}
+		bar.Increment()
+		// Simulate processing time
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	bar.Finish()
+	printSuccess(fmt.Sprintf("Processing complete! %d files created.", len(fileDataList)))
+}
+
 func main() {
-	// Call a function from cli.go
 	runCLI()
 }
