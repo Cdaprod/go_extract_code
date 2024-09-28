@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run Extract Code Action
-        uses: ./.github/actions/extract-code
+        uses: ./.github/actions/extract-code/action.yml
         with:
           build_file: 'docs/BUILD.md'
           output_dir: 'build_output'
