@@ -1,0 +1,101 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+
+env:
+  DOCKER_BUILDKIT: 1
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: cdaprod
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Ensures all Git history and tags are fetched
+
+      # Step 2: Set up QEMU for multi-architecture builds
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      # Step 3: Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Step 4: Log in to GitHub Container Registry
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 5: Set Docker image name and tags
+      - name: Set Docker image name and tags
+        id: vars
+        run: |
+          set -e
+
+          # Extract user and repo names, convert to lowercase
+          USER_NAME=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          REPO_NAME=$(echo "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="${USER_NAME}/${REPO_NAME}"
+
+          # Determine version using git describe; default to 0.1.0 if no tags are found
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.1.0")
+          VERSION=${VERSION#v}  # Remove 'v' prefix if present
+
+          # Set tags
+          DOCKER_TAGS="${REGISTRY}/${IMAGE_NAME}:${VERSION},${REGISTRY}/${IMAGE_NAME}:latest"
+
+          # Output variables to environment
+          echo "IMAGE_NAME=${IMAGE_NAME}" >> $GITHUB_ENV
+          echo "DOCKER_TAGS=${DOCKER_TAGS}" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+          # Set outputs using the new GitHub Actions syntax
+          echo "IMAGE_NAME=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "DOCKER_TAGS=${DOCKER_TAGS}" >> $GITHUB_OUTPUT
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+        shell: bash
+
+      # Step 6: Build and Push Docker Image
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .  # Context set to the root of the repository where the Dockerfile is located
+          platforms: linux/amd64,linux/arm64  # Specify target platforms; adjust as needed
+          push: ${{ github.event_name != 'pull_request' }}  # Push only on non-PR events
+          tags: ${{ steps.vars.outputs.DOCKER_TAGS }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Step 7: Post Build Cleanup
+      - name: Post Build Cleanup
+        if: always()
+        run: docker system prune -af
+
+      # Step 8: (Optional) Deploy to Servers
+      # Uncomment and configure the following step if deployment is required
+      # - name: Deploy to Servers
+      #   if: github.ref == 'refs/heads/main'
+      #   uses: appleboy/ssh-action@v0.1.5
+      #   with:
+      #     host: ${{ secrets.SERVER_HOST }}
+      #     username: ${{ secrets.SERVER_USER }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     script: |
+      #       cd ~/{REPO_NAME}
+      #       git pull origin main
+      #       docker-compose pull
+      #       docker-compose up -d

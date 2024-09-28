@@ -27,12 +27,18 @@ jobs:
       - name: Install Go Dependencies
         run: go mod tidy  # This will ensure go.sum is updated
 
-      # Step 4: Build the Go binary
+      # Step 4: Clean up old binary in the root directory
+      - name: Clean up old binary
+        run: |
+          # Remove old binary if it exists in the root
+          rm -f go_extract_code
+
+      # Step 5: Build the Go binary and place it in the root
       - name: Build Go Binary
         run: |
-          go build -o go_extract_code ./cli.go ./main.go  # Specify your main files
+          go build -o go_extract_code ./cli.go ./main.go  # Build the binary directly in the root directory
 
-      # Step 5: Commit and push the binary back to the repository
+      # Step 6: Commit and push the binary back to the repository
       - name: Commit and Push Binary
         run: |
           git config user.name "github-actions[bot]"
@@ -40,18 +46,16 @@ jobs:
 
           # Check if the binary exists
           if [ -f go_extract_code ]; then
-            # Move binary to a specific folder if needed
-            mkdir -p binaries
-            mv go_extract_code binaries/
+            # Add the binary and go.mod/go.sum to the Git index
+            git add go_extract_code go.mod go.sum
 
-            # Add the binary to the Git index
-            git add binaries/go_extract_code
-            git add go.mod go.sum  # Ensure go.mod and go.sum are added
-
-            # Commit the changes
-            git commit -m "ci: Add built binary go_extract_code and update go.mod/go.sum [skip ci]"
-            # Push changes to the repository
-            git push origin HEAD:main  # Change to your target branch if different
+            # Check if there are changes to commit
+            if ! git diff --cached --quiet; then
+              git commit -m "ci: Add latest built binary go_extract_code and update go.mod/go.sum [skip ci]"
+              git push origin HEAD:main  # Change to your target branch if different
+            else
+              echo "No changes to commit."
+            fi
           else
             echo "Binary not found, skipping commit."
           fi
