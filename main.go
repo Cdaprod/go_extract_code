@@ -372,7 +372,7 @@ func runCLI() {
 		}
 		bar.Increment()
 		// Simulate processing time
-		time.Sleep(50 * time.Millisecond) // Reduced sleep time for faster processing
+		time.Sleep(10 * time.Millisecond) // Reduced sleep time for faster processing
 	}
 
 	bar.Finish()
